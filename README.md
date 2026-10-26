@@ -6,6 +6,8 @@
 
 ![面板](docs/panel-pane.jpg)
 
+> 截图里是脱敏后的演示数据：文件名、路径、会话名、设备名都已替换成示例。
+
 ## 它补的四个洞
 
 1. **macOS 没有 Taildrop 图形界面。** 官方只有右键 Share 菜单和 `tailscale file cp`，发完没有任何记录，丢了就找不回。
