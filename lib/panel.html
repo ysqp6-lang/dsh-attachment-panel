@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>投送记录</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f6f7;
+    --bg-elevated: #ffffff;
+    --bg-sunken: #eeeeef;
+    --text: #1c1c1e;
+    --text-secondary: #61616b;
+    --text-tertiary: #8e8e96;
+    --border: #e2e2e5;
+    --border-strong: #d0d0d5;
+    --accent: #3b6ef6;
+    --accent-soft: rgba(59, 110, 246, 0.12);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.06);
+    --radius: 10px;
+    --card-hover: rgba(0, 0, 0, 0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131315;
+      --bg-elevated: #1c1c1f;
+      --bg-sunken: #0e0e10;
+      --text: #ececef;
+      --text-secondary: #a0a0a8;
+      --text-tertiary: #73737c;
+      --border: #2a2a2f;
+      --border-strong: #3a3a41;
+      --accent: #6b93ff;
+      --accent-soft: rgba(107, 147, 255, 0.16);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.5);
+      --card-hover: rgba(255, 255, 255, 0.05);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  header {
+    flex: none;
+    padding: 12px 16px 10px;
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    backdrop-filter: saturate(180%) blur(18px);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    z-index: 5;
+  }
+  .titleRow { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: 0.01em; }
+  .counts { font-size: 12px; color: var(--text-tertiary); }
+  .counts b { color: var(--text-secondary); font-weight: 500; }
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .searchWrap { position: relative; flex: 1 1 180px; min-width: 140px; }
+  .searchWrap input {
+    width: 100%;
+    height: 30px;
+    padding: 0 10px 0 28px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text);
+    font-size: 12.5px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .searchWrap input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .searchWrap svg { position: absolute; left: 8px; top: 8px; width: 14px; height: 14px; color: var(--text-tertiary); }
+  .segments { display: inline-flex; background: var(--bg-sunken); border-radius: 8px; padding: 2px; gap: 2px; }
+  .segments button {
+    border: 0; background: transparent; color: var(--text-secondary);
+    font-size: 12px; padding: 5px 10px; border-radius: 6px; cursor: pointer;
+    font-family: inherit; white-space: nowrap; transition: background 0.12s, color 0.12s;
+  }
+  .segments button[aria-pressed="true"] { background: var(--bg-elevated); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.08); font-weight: 500; }
+  .segments button:hover:not([aria-pressed="true"]) { color: var(--text); }
+  .iconBtn {
+    width: 30px; height: 30px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elevated);
+    color: var(--text-secondary); cursor: pointer; transition: background 0.12s, color 0.12s;
+  }
+  .iconBtn:hover { background: var(--card-hover); color: var(--text); }
+  .iconBtn svg { width: 14px; height: 14px; }
+  .iconBtn.spinning svg { animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  main { flex: 1; overflow-y: auto; padding: 4px 16px 40px; }
+  .day { margin-top: 16px; }
+  .day h2 {
+    position: sticky; top: 0; z-index: 2; margin: 0 0 8px;
+    font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: none;
+    color: var(--text-tertiary);
+    background: linear-gradient(var(--bg) 70%, transparent);
+    padding: 6px 0 4px;
+    display: flex; gap: 8px; align-items: baseline;
+  }
+  .day h2 em { font-style: normal; font-weight: 400; color: var(--text-tertiary); opacity: 0.8; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 8px;
+  }
+  .card {
+    position: relative; aspect-ratio: 1 / 1; border-radius: var(--radius);
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    overflow: hidden; cursor: pointer; padding: 0;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s;
+    display: flex; align-items: center; justify-content: center;
+    color: inherit; font-family: inherit; font-size: inherit;
+  }
+  .card:hover { transform: translateY(-1px); box-shadow: var(--shadow); border-color: var(--border-strong); }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .card img { width: 100%; height: 100%; object-fit: cover; display: block; background: var(--bg-sunken); }
+  .card .fileCard { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px; width: 100%; }
+  .card .fileCard .ext {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: var(--accent);
+    background: var(--accent-soft); padding: 2px 6px; border-radius: 4px;
+  }
+  .card .fileCard .fname {
+    font-size: 11px; color: var(--text-secondary); text-align: center; width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .card .dot {
+    position: absolute; top: 6px; left: 6px; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--bg-elevated) 80%, transparent);
+  }
+  .card .hint {
+    position: absolute; inset: auto 0 0 0; padding: 14px 6px 4px;
+    font-size: 10.5px; color: #fff; text-align: right;
+    background: linear-gradient(transparent, rgba(0,0,0,0.55));
+    opacity: 0; transition: opacity 0.12s; pointer-events: none;
+    font-variant-numeric: tabular-nums;
+  }
+  .card:hover .hint { opacity: 1; }
+  .card.missing { opacity: 0.55; }
+  .card.missing .fileCard .ext { color: var(--text-tertiary); background: var(--bg-sunken); }
+  .empty { padding: 60px 0; text-align: center; color: var(--text-tertiary); font-size: 12.5px; }
+  .sentinel { height: 1px; }
+
+  .viewer {
+    position: fixed; inset: 0; z-index: 40; display: none;
+    background: color-mix(in srgb, #000 72%, transparent);
+    backdrop-filter: blur(6px);
+    flex-direction: column;
+    padding: 16px;
+  }
+  .viewer[data-open="true"] { display: flex; }
+  .viewerTop { display: flex; align-items: center; gap: 10px; color: #fff; flex: none; }
+  .viewerTop .vname { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .viewerTop .vspacer { flex: 1; }
+  .viewerTop button {
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.1);
+    color: #fff; border-radius: 8px; height: 28px; padding: 0 10px; font-size: 12px;
+    cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 5px;
+  }
+  .viewerTop button:hover { background: rgba(255,255,255,0.2); }
+  .viewerStage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 12px 0; }
+  .viewerStage img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; box-shadow: 0 20px 60px rgba(0,0,0,0.45); }
+  .viewerStage .bigFile {
+    color: #fff; text-align: center; border: 1px dashed rgba(255,255,255,0.3);
+    border-radius: 12px; padding: 40px 56px; font-size: 14px;
+  }
+  .viewerMeta {
+    flex: none; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+    color: rgba(255,255,255,0.72); font-size: 11.5px; padding-top: 4px;
+  }
+  .viewerMeta .sep { opacity: 0.35; }
+  .viewerMeta .sess { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46vw; }
+  .viewerMeta .path {
+    width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10.5px; color: rgba(255,255,255,0.45); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .navBtn {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.1); color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .navBtn:hover { background: rgba(255,255,255,0.22); }
+  .navBtn[disabled] { opacity: 0.25; cursor: default; }
+  .navBtn.prev { left: 18px; }
+  .navBtn.next { right: 18px; }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(10px);
+    background: rgba(28,28,30,0.92); color: #fff; padding: 7px 14px; border-radius: 8px;
+    font-size: 12px; opacity: 0; pointer-events: none; transition: opacity 0.16s, transform 0.16s;
+    z-index: 60;
+  }
+  .toast[data-show="true"] { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .banner {
+    display: none; align-items: center; gap: 8px; margin: 8px 16px 0; padding: 7px 10px;
+    border-radius: 8px; background: var(--accent-soft); color: var(--text-secondary); font-size: 12px;
+  }
+  .banner[data-show="true"] { display: flex; }
+  .fileRows { display: flex; flex-direction: column; gap: 4px; }
+  .fileRow {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+    border-radius: 9px; background: var(--bg-elevated); border: 1px solid var(--border);
+    transition: border-color 0.12s, box-shadow 0.12s;
+  }
+  .fileRow:hover { border-color: var(--border-strong); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .ficon {
+    width: 34px; height: 34px; flex: none; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em;
+    color: var(--accent); background: var(--accent-soft);
+  }
+  .ficon.dir { color: var(--text-secondary); background: var(--bg-sunken); }
+  .ficon.gone { color: var(--text-tertiary); background: var(--bg-sunken); text-decoration: line-through; }
+  .fmain { flex: 1 1 auto; min-width: 0; }
+  .fname { font-size: 12.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fpath {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px;
+    color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .fmeta { flex: none; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+  .fmeta .fsess { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fops { flex: none; display: flex; gap: 4px; }
+  .fops button {
+    height: 24px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg-elevated); color: var(--text-secondary); font-size: 11px;
+    font-family: inherit; cursor: pointer; white-space: nowrap;
+  }
+  .fops button:hover { background: var(--card-hover); color: var(--text); }
+  .fops button:disabled { opacity: 0.4; cursor: default; }
+  .sendChips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 2px; }
+  .sendChip {
+    display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px;
+    border-radius: 999px; border: 1px solid var(--border); background: var(--bg-elevated);
+    color: var(--text-secondary); font-size: 12px; font-family: inherit; cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .sendChip:hover { border-color: var(--border-strong); color: var(--text); }
+  .sendChip[aria-pressed="true"] { background: var(--accent-soft); border-color: transparent; color: var(--accent); font-weight: 500; }
+  .sendChip .n { font-variant-numeric: tabular-nums; opacity: 0.7; }
+  .ftarget {
+    flex: none; font-size: 10.5px; color: var(--accent); background: var(--accent-soft);
+    padding: 2px 7px; border-radius: 999px; white-space: nowrap; max-width: 160px;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .native { flex: none; font-size: 10.5px; color: var(--text-tertiary); }
+  .sendBar { display: flex; align-items: center; gap: 10px; margin: 10px 0 2px; flex-wrap: wrap; }
+  .sendOpen {
+    height: 28px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg-elevated); color: var(--text); font: inherit; font-size: 12px;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  }
+  .sendOpen:hover { border-color: var(--border-strong); background: var(--card-hover); }
+  .sendHint { font-size: 11.5px; color: var(--text-tertiary); }
+  .sendForm {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    margin: 8px 0; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--bg-elevated);
+  }
+  .sendForm[hidden] { display: none; }
+  .sendForm .lab { font-size: 11.5px; color: var(--text-tertiary); }
+  .sendForm select {
+    height: 28px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font: inherit; font-size: 12px; padding: 0 8px;
+  }
+  .sendForm input[type="file"] { flex: 1 1 220px; font: inherit; font-size: 12px; color: var(--text-secondary); }
+  .sendForm button {
+    height: 28px; padding: 0 12px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font: inherit; font-size: 12px; cursor: pointer;
+  }
+  .sendForm button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .sendForm button.primary:disabled { opacity: 0.5; cursor: default; }
+  .sendForm button:not(.primary):hover { background: var(--card-hover); }
+  .sendStatus { width: 100%; font-size: 11.5px; color: var(--text-secondary); min-height: 15px; }
+  .sendStatus[data-error="true"] { color: var(--dsw-alias-state-error-primary, #d9534f); }
+  .recvNote {
+    display: flex; align-items: center; gap: 8px; margin: 10px 0 2px;
+    font-size: 11.5px; color: var(--text-tertiary); flex-wrap: wrap;
+  }
+  .recvNote button {
+    height: 26px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--bg-elevated); color: var(--text-secondary); font: inherit; font-size: 11.5px; cursor: pointer;
+  }
+  .recvNote button:hover { border-color: var(--border-strong); color: var(--text); }
+  .recvNote button:disabled { opacity: 0.45; cursor: default; }
+  .origin {
+    flex: none; font-size: 10.5px; padding: 2px 7px; border-radius: 999px;
+    background: var(--bg-sunken); color: var(--text-secondary); white-space: nowrap;
+  }
+  .origin.pending { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+  .origin.guess { background: transparent; border: 1px dashed var(--border-strong); color: var(--text-tertiary); }
+
+  body.embedded .fileRow { background: var(--bg); }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 6px; border: 3px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<header>
+  <div class="titleRow">
+    <h1>投送记录</h1>
+    <div class="counts" id="counts">载入中…</div>
+  </div>
+  <div class="tools">
+    <div class="searchWrap">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.6"></circle><path d="M10.4 10.4 13.5 13.5" stroke-linecap="round"></path></svg>
+      <input id="search" type="search" placeholder="搜文件名 / 会话名" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="segments" id="segments">
+      <button data-scope="user" aria-pressed="true">图片</button>
+      <button data-scope="file" aria-pressed="false">文件</button>
+      <button data-scope="send" aria-pressed="false">投送</button>
+      <button data-scope="recv" aria-pressed="false">接收</button>
+      <button data-scope="tool" aria-pressed="false">工具图片</button>
+      <button data-scope="all" aria-pressed="false">全部</button>
+    </div>
+    <button class="iconBtn" id="refresh" title="重新扫描会话日志">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.7" stroke-linecap="round"></path><path d="M13.4 2.2v3h-3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    </button>
+  </div>
+</header>
+<div class="banner" id="banner">正在重新扫描会话日志…</div>
+<main id="main">
+  <div class="empty" id="empty">载入中…</div>
+</main>
+
+<div class="viewer" id="viewer" data-open="false">
+  <div class="viewerTop">
+    <span class="vname" id="vname"></span>
+    <span class="vspacer"></span>
+    <button id="vreveal" title="在 Finder 里显示">在 Finder 显示</button>
+    <button id="vcopy" title="复制本地路径">复制路径</button>
+    <button id="vopen" title="新标签打开原图">打开原图</button>
+    <button id="vclose" title="关闭（Esc）">关闭</button>
+  </div>
+  <div class="viewerStage" id="vstage"></div>
+  <div class="viewerMeta">
+    <span id="vtime"></span>
+    <span class="sep">·</span>
+    <span id="vsize"></span>
+    <span class="sep" id="vdimSep">·</span>
+    <span id="vdim"></span>
+    <span class="sep" id="vsessSep">·</span>
+    <span class="sess" id="vsess"></span>
+    <span class="path" id="vpath"></span>
+  </div>
+  <button class="navBtn prev" id="vprev" title="上一张（←）">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3.5 5 8l4.5 4.5"></path></svg>
+  </button>
+  <button class="navBtn next" id="vnext" title="下一张（→）">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5 11 8l-4.5 4.5"></path></svg>
+  </button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var API = '/dsh-ap/api';
+  var state = { scope: 'user', query: '', items: [], files: [], sends: [], sendTargets: [], sendTarget: '', received: null, filteredRecv: [], counts: null, shown: 0, batch: 180, filtered: [], filteredFiles: [], filteredSends: [] };
+  var el = function (id) { return document.getElementById(id); };
+  var mainEl = el('main');
+  var emptyEl = el('empty');
+  var countsEl = el('counts');
+  var searchEl = el('search');
+  var refreshEl = el('refresh');
+  var bannerEl = el('banner');
+  var viewerEl = el('viewer');
+  var stageEl = el('vstage');
+  var toastEl = el('toast');
+  var viewerIndex = -1;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function hexOf(id) { return String(id || '').replace(/^sha256:/, ''); }
+  function isImage(it) {
+    if (it.blockType === 'image') return true;
+    return typeof it.mediaType === 'string' && it.mediaType.indexOf('image/') === 0;
+  }
+  function bytesText(n) {
+    if (!n) return '—';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
+    return (n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 1 : 0) + ' MB';
+  }
+  function pad(n) { return n < 10 ? '0' + n : String(n); }
+  function timeText(t) {
+    if (!t) return '';
+    var d = new Date(t);
+    return pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function dayKey(t) {
+    var d = new Date(t || 0);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  function dayLabel(key) {
+    var parts = key.split('-');
+    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    var now = new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var diff = Math.round((today - d) / 86400000);
+    var week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()];
+    if (diff === 0) return '今天 · ' + week;
+    if (diff === 1) return '昨天 · ' + week;
+    if (diff > 1 && diff < 7) return diff + ' 天前 · ' + week;
+    return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 · ' + week;
+  }
+  function titleOf(it) {
+    if (it.title) return it.title;
+    if (it.cwd) return it.cwd.split('/').filter(Boolean).slice(-1)[0] || it.cwd;
+    return it.sessionId || '';
+  }
+  function fileName(it) {
+    if (it.name) return it.name;
+    if (isImage(it)) return '截图';
+    return '文件';
+  }
+  function extOf(it) {
+    var n = fileName(it);
+    var m = /\.([a-z0-9]{1,8})$/i.exec(n);
+    if (m) return m[1].toUpperCase();
+    if (it.mediaType) {
+      var t = it.mediaType.split('/')[1];
+      if (t) return t.toUpperCase();
+    }
+    return 'FILE';
+  }
+
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.dataset.show = 'true';
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { toastEl.dataset.show = 'false'; }, 1600);
+  }
+
+  function haystack(it) {
+    return [
+      fileName(it),
+      titleOf(it),
+      it.cwd || '',
+      it.mediaType || '',
+      extOf(it),
+      isImage(it) ? '截图 图片 照片 图 image' : '文件 附件 file',
+      it.kind === 'tool' ? '工具' : '投送',
+    ].join(' ').toLowerCase();
+  }
+
+  function shortPath(p) {
+    var text = String(p || '');
+    if (text.length <= 96) return text;
+    return text.slice(0, 24) + '…' + text.slice(-68);
+  }
+
+  function fileHaystack(f) {
+    return [f.name || '', f.path || '', f.ext || '', f.title || '', f.kind === 'dir' ? '文件夹 目录 dir' : '文件 file'].join(' ').toLowerCase();
+  }
+
+  function applyFilter() {
+    var q = state.query.trim().toLowerCase();
+    mainEl.innerHTML = '';
+    if (state.scope === 'file') {
+      state.filteredFiles = state.files.filter(function (f) {
+        if (!q) return true;
+        return fileHaystack(f).indexOf(q) >= 0;
+      });
+      renderFiles();
+      return;
+    }
+    if (state.scope === 'recv') {
+      var recvItems = (state.received && state.received.items) || [];
+      state.filteredRecv = recvItems.filter(function (r) {
+        if (!q) return true;
+        return [r.name || '', r.path || '', r.origin || '', r.ext || ''].join(' ').toLowerCase().indexOf(q) >= 0;
+      });
+      renderReceived();
+      return;
+    }
+    if (state.scope === 'send') {
+      state.filteredSends = state.sends.filter(function (r) {
+        if (state.sendTarget && r.target !== state.sendTarget) return false;
+        if (!q) return true;
+        return [r.name || '', r.path || '', r.target || '', r.title || '', r.ext || ''].join(' ').toLowerCase().indexOf(q) >= 0;
+      });
+      renderSends();
+      return;
+    }
+    state.filtered = state.items.filter(function (it) {
+      if (!q) return true;
+      return haystack(it).indexOf(q) >= 0;
+    });
+    state.shown = 0;
+    if (state.filtered.length === 0) {
+      var box = document.createElement('div');
+      box.className = 'empty';
+      box.textContent = state.items.length === 0 ? '还没有投送记录' : '没有匹配的结果';
+      mainEl.appendChild(box);
+      return;
+    }
+    renderMore();
+  }
+
+  function fileOp(path, mode) {
+    fetch(API + (mode === 'reveal' ? '/reveal-path' : '/open-path'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: path })
+    }).then(function (r) { return r.json(); }).then(function (data) {
+      if (!data || !data.ok) toast('失败：' + ((data && data.error) || '未知错误'));
+      else if (mode === 'reveal') toast('已在 Finder 里显示');
+    }).catch(function () { toast('请求失败'); });
+  }
+
+  function makeFileRow(f) {
+    var row = document.createElement('div');
+    row.className = 'fileRow';
+
+    var icon = document.createElement('div');
+    icon.className = 'ficon' + (f.kind === 'dir' ? ' dir' : '') + (f.kind === 'missing' || f.kind === 'denied' ? ' gone' : '');
+    icon.textContent = f.kind === 'dir' ? 'DIR' : f.kind === 'missing' ? '没了' : f.kind === 'denied' ? '无权' : (f.ext || 'FILE').toUpperCase().slice(0, 5);
+
+    var main = document.createElement('div');
+    main.className = 'fmain';
+    var name = document.createElement('div');
+    name.className = 'fname';
+    name.textContent = f.name || f.path;
+    var pathEl = document.createElement('div');
+    pathEl.className = 'fpath';
+    pathEl.title = f.path;
+    pathEl.textContent = shortPath(f.path);
+    main.appendChild(name);
+    main.appendChild(pathEl);
+
+    var meta = document.createElement('div');
+    meta.className = 'fmeta';
+    var sizeEl = document.createElement('span');
+    sizeEl.textContent = f.kind === 'dir' ? '文件夹' : f.kind === 'missing' ? '已不在' : f.kind === 'denied' ? '无权限' : bytesText(f.size);
+    meta.appendChild(sizeEl);
+    var timeEl = document.createElement('span');
+    timeEl.textContent = f.lastTime ? new Date(f.lastTime).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : '';
+    meta.appendChild(timeEl);
+    if (f.title) {
+      var sess = document.createElement('span');
+      sess.className = 'fsess';
+      sess.textContent = f.title;
+      sess.title = f.title;
+      meta.appendChild(sess);
+    }
+
+    var ops = document.createElement('div');
+    ops.className = 'fops';
+    var revealBtn = document.createElement('button');
+    revealBtn.type = 'button';
+    revealBtn.textContent = 'Finder';
+    revealBtn.title = '在 Finder 里显示';
+    var copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.textContent = '复制';
+    copyBtn.title = '复制路径';
+    var openBtn = document.createElement('button');
+    openBtn.type = 'button';
+    openBtn.textContent = '打开';
+    openBtn.title = '用默认程序打开';
+    var alive = f.kind === 'file' || f.kind === 'dir';
+    revealBtn.disabled = !alive;
+    openBtn.disabled = !alive;
+    revealBtn.addEventListener('click', function () { fileOp(f.path, 'reveal'); });
+    openBtn.addEventListener('click', function () { fileOp(f.path, 'open'); });
+    copyBtn.addEventListener('click', function () { copyText(f.path); });
+    ops.appendChild(revealBtn);
+    ops.appendChild(copyBtn);
+    ops.appendChild(openBtn);
+
+    row.appendChild(icon);
+    row.appendChild(main);
+    row.appendChild(meta);
+    row.appendChild(ops);
+    return row;
+  }
+
+  function makeSendRow(r) {
+    var row = document.createElement('div');
+    row.className = 'fileRow';
+
+    var icon = document.createElement('div');
+    icon.className = 'ficon' + (r.kind === 'missing' ? ' gone' : '');
+    icon.textContent = r.kind === 'missing' ? '没了' : (r.ext || 'FILE').toUpperCase().slice(0, 5);
+
+    var main = document.createElement('div');
+    main.className = 'fmain';
+    var name = document.createElement('div');
+    name.className = 'fname';
+    name.textContent = r.name || r.path;
+    var pathEl = document.createElement('div');
+    pathEl.className = 'fpath';
+    pathEl.textContent = shortPath(r.path);
+    pathEl.title = r.path;
+    main.appendChild(name);
+    main.appendChild(pathEl);
+
+    var target = document.createElement('div');
+    target.className = 'ftarget';
+    target.textContent = '→ ' + r.target;
+    target.title = '投送目标设备：' + r.target + (r.count > 1 ? '（共投送 ' + r.count + ' 次）' : '');
+
+    var meta = document.createElement('div');
+    meta.className = 'fmeta';
+    var sizeEl = document.createElement('span');
+    sizeEl.textContent = r.kind === 'missing' ? '原文件已不在' : bytesText(r.size);
+    meta.appendChild(sizeEl);
+    var timeEl = document.createElement('span');
+    timeEl.textContent = new Date(r.lastTime || 0).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+    meta.appendChild(timeEl);
+    if (r.title) {
+      var sess = document.createElement('span');
+      sess.className = 'fsess';
+      sess.textContent = r.title;
+      sess.title = r.title;
+      meta.appendChild(sess);
+    }
+
+    var ops = document.createElement('div');
+    ops.className = 'fops';
+    var revealBtn = document.createElement('button');
+    revealBtn.type = 'button';
+    revealBtn.textContent = 'Finder';
+    revealBtn.title = '在本机 Finder 里显示原文件';
+    revealBtn.disabled = !r.exists;
+    var copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.textContent = '复制';
+    copyBtn.title = '复制本机路径';
+    revealBtn.addEventListener('click', function () { fileOp(r.path, 'reveal'); });
+    copyBtn.addEventListener('click', function () { copyText(r.path); });
+    ops.appendChild(revealBtn);
+    ops.appendChild(copyBtn);
+
+    row.appendChild(icon);
+    row.appendChild(target);
+    row.appendChild(main);
+    row.appendChild(meta);
+    row.appendChild(ops);
+    return row;
+  }
+
+  function renderSendChips() {
+    var bar = document.createElement('div');
+    bar.className = 'sendChips';
+    var total = state.sends.length;
+    var all = document.createElement('button');
+    all.type = 'button';
+    all.className = 'sendChip';
+    all.setAttribute('aria-pressed', state.sendTarget === '' ? 'true' : 'false');
+    all.innerHTML = '全部设备 <span class="n">' + total + '</span>';
+    all.addEventListener('click', function () { state.sendTarget = ''; applyFilter(); });
+    bar.appendChild(all);
+    state.sendTargets.forEach(function (t) {
+      var chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'sendChip';
+      chip.setAttribute('aria-pressed', state.sendTarget === t.target ? 'true' : 'false');
+      chip.innerHTML = esc(t.target) + ' <span class="n">' + t.count + '</span>';
+      chip.addEventListener('click', function () { state.sendTarget = t.target; applyFilter(); });
+      bar.appendChild(chip);
+    });
+    mainEl.appendChild(bar);
+  }
+
+  function renderSendBar() {
+    var bar = document.createElement('div');
+    bar.className = 'sendBar';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sendOpen';
+    btn.textContent = '＋ 投送文件';
+    btn.title = '选设备 + 选文件，直接在这发出去（tailscale file cp）';
+    var hint = document.createElement('span');
+    hint.className = 'sendHint';
+    hint.textContent = '选好设备和文件，直接在这里发，不用再找 DSH 说一次';
+    bar.appendChild(btn);
+    bar.appendChild(hint);
+    mainEl.appendChild(bar);
+
+    var form = document.createElement('div');
+    form.className = 'sendForm';
+    form.hidden = true;
+
+    var lab1 = document.createElement('span');
+    lab1.className = 'lab';
+    lab1.textContent = '发给';
+    var select = document.createElement('select');
+    var opt = document.createElement('option');
+    opt.textContent = '载入设备…';
+    select.appendChild(opt);
+    select.disabled = true;
+
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+
+    var go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'primary';
+    go.textContent = '发送';
+    go.disabled = true;
+
+    var cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = '取消';
+
+    var status = document.createElement('div');
+    status.className = 'sendStatus';
+
+    form.appendChild(lab1);
+    form.appendChild(select);
+    form.appendChild(input);
+    form.appendChild(go);
+    form.appendChild(cancel);
+    form.appendChild(status);
+    mainEl.appendChild(form);
+
+    function setStatus(text, isError) {
+      status.textContent = text || '';
+      status.dataset.error = isError ? 'true' : 'false';
+    }
+
+    function refreshGo() {
+      go.disabled = select.disabled || select.value === '' || input.files.length === 0;
+    }
+
+    btn.addEventListener('click', function () {
+      form.hidden = !form.hidden;
+      if (form.hidden) return;
+      setStatus('');
+      if (select.dataset.loaded === 'true') return;
+      fetch(API + '/targets').then(function (r) { return r.json(); }).then(function (data) {
+        select.innerHTML = '';
+        if (!data || !data.ok) {
+          var o = document.createElement('option');
+          o.textContent = '拿不到设备列表';
+          select.appendChild(o);
+          setStatus('设备列表获取失败：' + ((data && data.error) || '未知错误'), true);
+          return;
+        }
+        var list = data.targets || [];
+        if (list.length === 0) {
+          var o2 = document.createElement('option');
+          o2.textContent = '没有可投送设备';
+          select.appendChild(o2);
+          setStatus('Tailscale 里没有开启文件共享的设备', true);
+          return;
+        }
+        list.forEach(function (t) {
+          var o = document.createElement('option');
+          o.value = t.target;
+          o.textContent = t.target + (t.online ? '' : '（离线）') + (t.os ? ' · ' + t.os : '');
+          o.disabled = !t.online;
+          select.appendChild(o);
+        });
+        var online = list.filter(function (t) { return t.online; });
+        if (online.length === 0) setStatus('设备都在离线，投送会失败', true);
+        select.disabled = false;
+        select.dataset.loaded = 'true';
+        refreshGo();
+      }).catch(function (e) {
+        setStatus('设备列表请求失败：' + e, true);
+      });
+    });
+
+    select.addEventListener('change', refreshGo);
+    input.addEventListener('change', refreshGo);
+
+    cancel.addEventListener('click', function () {
+      form.hidden = true;
+      setStatus('');
+      input.value = '';
+      refreshGo();
+    });
+
+    function uploadOne(file, target, onProgress) {
+      return new Promise(function (resolve) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', API + '/send?target=' + encodeURIComponent(target) + '&name=' + encodeURIComponent(file.name));
+        xhr.setRequestHeader('content-type', 'application/octet-stream');
+        xhr.upload.onprogress = function (e) {
+          if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+        };
+        xhr.onload = function () {
+          var data = null;
+          try { data = JSON.parse(xhr.responseText); } catch (e) { data = null; }
+          resolve(data || { ok: xhr.status === 200, error: 'HTTP ' + xhr.status });
+        };
+        xhr.onerror = function () { resolve({ ok: false, error: '网络错误' }); };
+        xhr.send(file);
+      });
+    }
+
+    go.addEventListener('click', function () {
+      var target = select.value;
+      var files = Array.prototype.slice.call(input.files);
+      if (!target || files.length === 0) return;
+      go.disabled = true;
+      cancel.disabled = true;
+      var done = 0;
+      var failed = [];
+      function step(i) {
+        if (i >= files.length) {
+          cancel.disabled = false;
+          refreshGo();
+          if (failed.length === 0) {
+            setStatus('已投送给 ' + target + '：' + files.length + ' 个文件', false);
+            toast('投送完成：' + files.length + ' 个文件 → ' + target);
+            setTimeout(function () { load(true); }, 700);
+          } else {
+            setStatus('成功 ' + (files.length - failed.length) + ' 个，失败 ' + failed.length + ' 个：' + failed.join('；'), true);
+          }
+          return;
+        }
+        var f = files[i];
+        setStatus('正在发送 ' + (i + 1) + '/' + files.length + '：' + f.name + '（0%）', false);
+        uploadOne(f, target, function (ratio) {
+          setStatus('正在发送 ' + (i + 1) + '/' + files.length + '：' + f.name + '（' + Math.round(ratio * 100) + '%）', false);
+        }).then(function (res) {
+          if (!res.ok) failed.push(f.name + ' → ' + (res.error || '失败'));
+          step(i + 1);
+        });
+      }
+      step(0);
+    });
+  }
+
+  function renderSends() {
+    renderSendBar();
+    renderSendChips();
+    if (state.filteredSends.length === 0) {
+      var box = document.createElement('div');
+      box.className = 'empty';
+      box.textContent = state.sends.length === 0 ? '还没有投送记录（只认 DSH 执行过的 tailscale file cp）' : '没有匹配的投送';
+      mainEl.appendChild(box);
+      return;
+    }
+    var lastDay = null;
+    var rows = null;
+    for (var i = 0; i < state.filteredSends.length; i++) {
+      var r = state.filteredSends[i];
+      var key = dayKey(r.lastTime);
+      if (key !== lastDay) {
+        lastDay = key;
+        var section = document.createElement('section');
+        section.className = 'day';
+        var h2 = document.createElement('h2');
+        var n = state.filteredSends.filter(function (x) { return dayKey(x.lastTime) === key; }).length;
+        h2.innerHTML = '<span>' + esc(dayLabel(key)) + '</span><em>' + n + '</em>';
+        section.appendChild(h2);
+        rows = document.createElement('div');
+        rows.className = 'fileRows';
+        section.appendChild(rows);
+        mainEl.appendChild(section);
+      }
+      rows.appendChild(makeSendRow(r));
+    }
+  }
+
+  function makeRecvRow(r) {
+    var row = document.createElement('div');
+    row.className = 'fileRow';
+
+    var icon = document.createElement('div');
+    icon.className = 'ficon';
+    icon.textContent = (r.ext || 'FILE').toUpperCase().slice(0, 5);
+
+    var badge = document.createElement('div');
+    badge.className = 'origin' + (r.pending ? ' pending' : r.certain ? '' : ' guess');
+    badge.textContent = r.pending ? '待接收' : r.certain ? '收到' : '疑似收到';
+
+    var main = document.createElement('div');
+    main.className = 'fmain';
+    var name = document.createElement('div');
+    name.className = 'fname';
+    name.textContent = r.name;
+    var pathEl = document.createElement('div');
+    pathEl.className = 'fpath';
+    pathEl.textContent = shortPath(r.path);
+    pathEl.title = r.path;
+    main.appendChild(name);
+    main.appendChild(pathEl);
+
+    var meta = document.createElement('div');
+    meta.className = 'fmeta';
+    var sizeEl = document.createElement('span');
+    sizeEl.textContent = bytesText(r.size);
+    meta.appendChild(sizeEl);
+    var timeEl = document.createElement('span');
+    timeEl.textContent = new Date(r.time || 0).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+    meta.appendChild(timeEl);
+
+    var ops = document.createElement('div');
+    ops.className = 'fops';
+    var revealBtn = document.createElement('button');
+    revealBtn.type = 'button';
+    revealBtn.textContent = 'Finder';
+    revealBtn.title = '在 Finder 里显示';
+    var copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.textContent = '复制';
+    copyBtn.title = '复制路径';
+    var openBtn = document.createElement('button');
+    openBtn.type = 'button';
+    openBtn.textContent = '打开';
+    openBtn.title = '用默认程序打开';
+    revealBtn.addEventListener('click', function () { fileOp(r.path, 'reveal'); });
+    openBtn.addEventListener('click', function () { fileOp(r.path, 'open'); });
+    copyBtn.addEventListener('click', function () { copyText(r.path); });
+    ops.appendChild(revealBtn);
+    ops.appendChild(copyBtn);
+    ops.appendChild(openBtn);
+
+    row.appendChild(icon);
+    row.appendChild(badge);
+    row.appendChild(main);
+    row.appendChild(meta);
+    row.appendChild(ops);
+    return row;
+  }
+
+  function renderReceived() {
+    var data = state.received;
+    var note = document.createElement('div');
+    note.className = 'recvNote';
+    if (!data) {
+      note.textContent = '正在扫描收件箱…';
+      mainEl.appendChild(note);
+      return;
+    }
+    var pending = data.pendingCount || 0;
+    var head = document.createElement('span');
+    head.innerHTML = '待接收 <b>' + pending + '</b> · inbox <span style="font-family:ui-monospace,Menlo,monospace;font-size:10.5px">' + esc(data.inboxDir || '') + '</span>';
+
+    var pullBtn = document.createElement('button');
+    pullBtn.type = 'button';
+    pullBtn.textContent = '从 inbox 收下';
+    pullBtn.title = '执行 tailscale file get，把待接收文件移到 ~/Downloads';
+    pullBtn.disabled = pending === 0;
+    pullBtn.addEventListener('click', function () {
+      pullBtn.disabled = true;
+      pullBtn.textContent = '收取中…';
+      fetch(API + '/receive-pull', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ dir: (data.receiveDirs || [])[0] || '' })
+      }).then(function (r) { return r.json(); }).then(function (res) {
+        if (res && res.ok) toast('已收下' + (res.stdout ? '：' + res.stdout : ''));
+        else toast('收取失败：' + ((res && res.error) || '未知错误'));
+        loadReceived(true);
+      }).catch(function () { toast('请求失败'); loadReceived(true); });
+    });
+
+    var refreshBtn = document.createElement('button');
+    refreshBtn.type = 'button';
+    refreshBtn.textContent = '重新扫描';
+    refreshBtn.addEventListener('click', function () { loadReceived(true); });
+
+    note.appendChild(head);
+    note.appendChild(pullBtn);
+    note.appendChild(refreshBtn);
+    mainEl.appendChild(note);
+
+    if (state.filteredRecv.length === 0) {
+      var box = document.createElement('div');
+      box.className = 'empty';
+      box.textContent = (data.items || []).length === 0
+        ? '没有待接收或近期收到的文件（浏览器下载已排除）'
+        : '没有匹配的结果';
+      mainEl.appendChild(box);
+      return;
+    }
+
+    var lastDay = null;
+    var rows = null;
+    for (var i = 0; i < state.filteredRecv.length; i++) {
+      var r = state.filteredRecv[i];
+      var key = dayKey(r.time);
+      if (key !== lastDay) {
+        lastDay = key;
+        var section = document.createElement('section');
+        section.className = 'day';
+        var h2 = document.createElement('h2');
+        var n = state.filteredRecv.filter(function (x) { return dayKey(x.time) === key; }).length;
+        h2.innerHTML = '<span>' + esc(dayLabel(key)) + '</span><em>' + n + '</em>';
+        section.appendChild(h2);
+        rows = document.createElement('div');
+        rows.className = 'fileRows';
+        section.appendChild(rows);
+        mainEl.appendChild(section);
+      }
+      rows.appendChild(makeRecvRow(r));
+    }
+    var tail = document.createElement('div');
+    tail.className = 'empty';
+    tail.style.padding = '16px 0 8px';
+    tail.textContent = '「疑似收到」= ~/Downloads 里没有浏览器下载标记的文件（Taildrop / AirDrop 都不带标记，所以无法百分百区分）';
+    mainEl.appendChild(tail);
+  }
+
+  function renderFiles() {
+    if (state.filteredFiles.length === 0) {
+      var box = document.createElement('div');
+      box.className = 'empty';
+      box.textContent = state.files.length === 0 ? '没有引用过任何文件路径' : '没有匹配的文件';
+      mainEl.appendChild(box);
+      return;
+    }
+    var lastDay = null;
+    var rows = null;
+    for (var i = 0; i < state.filteredFiles.length; i++) {
+      var f = state.filteredFiles[i];
+      var key = dayKey(f.lastTime);
+      if (key !== lastDay) {
+        lastDay = key;
+        var section = document.createElement('section');
+        section.className = 'day';
+        var h2 = document.createElement('h2');
+        var n = state.filteredFiles.filter(function (x) { return dayKey(x.lastTime) === key; }).length;
+        h2.innerHTML = '<span>' + esc(dayLabel(key)) + '</span><em>' + n + '</em>';
+        section.appendChild(h2);
+        rows = document.createElement('div');
+        rows.className = 'fileRows';
+        section.appendChild(rows);
+        mainEl.appendChild(section);
+      }
+      rows.appendChild(makeFileRow(f));
+    }
+    var tail = document.createElement('div');
+    tail.className = 'empty';
+    tail.style.padding = '16px 0 8px';
+    tail.textContent = '共 ' + state.filteredFiles.length + ' 个路径';
+    mainEl.appendChild(tail);
+  }
+
+  function renderMore() {
+    var observerTarget = document.getElementById('sentinel');
+    if (observerTarget) observerTarget.remove();
+    var chunk = state.filtered.slice(state.shown, state.shown + state.batch);
+    var lastDay = null;
+    var section = null;
+    var grid = null;
+    for (var i = 0; i < chunk.length; i++) {
+      var it = chunk[i];
+      var key = dayKey(it.time);
+      if (key !== lastDay) {
+        lastDay = key;
+        section = document.createElement('section');
+        section.className = 'day';
+        var h2 = document.createElement('h2');
+        var countInDay = state.filtered.filter(function (x) { return dayKey(x.time) === key; }).length;
+        h2.innerHTML = '<span>' + esc(dayLabel(key)) + '</span><em>' + countInDay + '</em>';
+        section.appendChild(h2);
+        grid = document.createElement('div');
+        grid.className = 'grid';
+        section.appendChild(grid);
+        mainEl.appendChild(section);
+      }
+      grid.appendChild(makeCard(it, state.shown + i));
+    }
+    state.shown += chunk.length;
+    if (state.shown < state.filtered.length) {
+      var sentinel = document.createElement('div');
+      sentinel.className = 'sentinel';
+      sentinel.id = 'sentinel';
+      mainEl.appendChild(sentinel);
+      var io = new IntersectionObserver(function (entries) {
+        if (entries.some(function (e) { return e.isIntersecting; })) {
+          io.disconnect();
+          renderMore();
+        }
+      }, { rootMargin: '600px' });
+      io.observe(sentinel);
+    } else {
+      var tail = document.createElement('div');
+      tail.className = 'empty';
+      tail.style.padding = '24px 0 8px';
+      tail.textContent = '就这些了';
+      mainEl.appendChild(tail);
+    }
+  }
+
+  function makeCard(it, index) {
+    var card = document.createElement('button');
+    card.className = 'card' + (it.exists ? '' : ' missing');
+    card.type = 'button';
+    card.dataset.index = String(index);
+    card.title = fileName(it) + '  ·  ' + titleOf(it) + '  ·  ' + timeText(it.time);
+    if (isImage(it) && it.exists) {
+      var img = document.createElement('img');
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.alt = fileName(it);
+      img.src = API + '/thumb/' + hexOf(it.id) + '?w=320';
+      card.appendChild(img);
+    } else {
+      var box = document.createElement('div');
+      box.className = 'fileCard';
+      var ext = document.createElement('span');
+      ext.className = 'ext';
+      ext.textContent = it.exists ? extOf(it) : '缺失';
+      var nm = document.createElement('span');
+      nm.className = 'fname';
+      nm.textContent = fileName(it);
+      box.appendChild(ext);
+      box.appendChild(nm);
+      card.appendChild(box);
+    }
+    if (it.kind === 'tool') {
+      var dot = document.createElement('span');
+      dot.className = 'dot';
+      card.appendChild(dot);
+    }
+    var hint = document.createElement('span');
+    hint.className = 'hint';
+    hint.textContent = timeText(it.time);
+    card.appendChild(hint);
+    card.addEventListener('click', function () { openViewer(Number(card.dataset.index)); });
+    return card;
+  }
+
+  function openViewer(index) {
+    if (index < 0 || index >= state.filtered.length) return;
+    viewerIndex = index;
+    var it = state.filtered[index];
+    viewerEl.dataset.open = 'true';
+    el('vname').textContent = fileName(it);
+    el('vtime').textContent = new Date(it.time || 0).toLocaleString('zh-CN', { hour12: false });
+    el('vsize').textContent = bytesText(it.bytes);
+    var dim = it.width && it.height ? it.width + ' × ' + it.height : '';
+    el('vdim').textContent = dim;
+    el('vdimSep').style.display = dim ? '' : 'none';
+    el('vsess').textContent = titleOf(it);
+    el('vsessSep').style.display = '';
+    el('vpath').textContent = it.path || '（附件实体已不在磁盘上）';
+    stageEl.innerHTML = '';
+    if (isImage(it) && it.exists) {
+      var img = document.createElement('img');
+      img.src = API + '/raw/' + hexOf(it.id);
+      img.alt = fileName(it);
+      stageEl.appendChild(img);
+    } else {
+      var box = document.createElement('div');
+      box.className = 'bigFile';
+      box.textContent = it.exists ? extOf(it) + ' 文件（' + bytesText(it.bytes) + '）' : '这个附件已经不在磁盘上了';
+      stageEl.appendChild(box);
+    }
+    el('vprev').disabled = index <= 0;
+    el('vnext').disabled = index >= state.filtered.length - 1;
+  }
+
+  function closeViewer() {
+    viewerEl.dataset.open = 'false';
+    stageEl.innerHTML = '';
+    viewerIndex = -1;
+  }
+
+  function step(delta) {
+    var next = viewerIndex + delta;
+    if (next < 0 || next >= state.filtered.length) return;
+    if (next >= state.shown) {
+      state.shown = Math.min(state.filtered.length, next + 1);
+      renderMore();
+    }
+    openViewer(next);
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast('已复制'); }, function () { toast('复制失败'); });
+      return;
+    }
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); toast('已复制'); } catch (e) { toast('复制失败'); }
+    ta.remove();
+  }
+
+  function currentItem() {
+    return viewerIndex >= 0 ? state.filtered[viewerIndex] : null;
+  }
+
+  el('vclose').addEventListener('click', closeViewer);
+  el('vprev').addEventListener('click', function () { step(-1); });
+  el('vnext').addEventListener('click', function () { step(1); });
+  viewerEl.addEventListener('click', function (event) {
+    if (event.target === viewerEl || event.target === stageEl) closeViewer();
+  });
+  el('vcopy').addEventListener('click', function () {
+    var it = currentItem();
+    if (it && it.path) copyText(it.path);
+    else toast('没有本地路径可复制');
+  });
+  el('vopen').addEventListener('click', function () {
+    var it = currentItem();
+    if (it && it.exists) window.open(API + '/raw/' + hexOf(it.id), '_blank');
+  });
+  el('vreveal').addEventListener('click', function () {
+    var it = currentItem();
+    if (!it) return;
+    fetch(API + '/reveal', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: it.id })
+    }).then(function (r) { return r.json(); }).then(function (data) {
+      toast(data && data.ok ? '已在 Finder 里显示' : '打不开：' + (data && data.error ? data.error : '未知错误'));
+    }).catch(function () { toast('请求失败'); });
+  });
+  document.addEventListener('keydown', function (event) {
+    if (viewerEl.dataset.open !== 'true') return;
+    if (event.key === 'Escape') closeViewer();
+    else if (event.key === 'ArrowLeft') step(-1);
+    else if (event.key === 'ArrowRight') step(1);
+  });
+
+  var searchTimer = null;
+  searchEl.addEventListener('input', function () {
+    state.query = searchEl.value;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(applyFilter, 120);
+  });
+
+  el('segments').addEventListener('click', function (event) {
+    var btn = event.target.closest('button[data-scope]');
+    if (!btn || btn.dataset.scope === state.scope) return;
+    state.scope = btn.dataset.scope;
+    Array.prototype.forEach.call(el('segments').querySelectorAll('button'), function (b) {
+      b.setAttribute('aria-pressed', b.dataset.scope === state.scope ? 'true' : 'false');
+    });
+    load(false);
+  });
+
+  refreshEl.addEventListener('click', function () { load(true); });
+
+  function setBanner(on) { bannerEl.dataset.show = on ? 'true' : 'false'; }
+
+  function loadReceived(force) {
+    refreshEl.classList.add('spinning');
+    state.received = null;
+    mainEl.innerHTML = '';
+    fetch(API + '/received' + (force ? '?refresh=1' : '')).then(function (r) { return r.json(); }).then(function (data) {
+      if (!data || data.ok !== true) throw new Error((data && data.error) || '接收扫描失败');
+      state.received = data;
+      var pending = data.pendingCount || 0;
+      var total = (data.items || []).length;
+      countsEl.innerHTML = '待接收 <b>' + pending + '</b> · 疑似收到 <b>' + Math.max(0, total - pending) + '</b> · 收件目录 <span style="font-family:ui-monospace,Menlo,monospace;font-size:10.5px">' + esc((data.receiveDirs || []).join(' ')) + '</span>';
+      applyFilter();
+    }).catch(function (error) {
+      mainEl.innerHTML = '';
+      var box = document.createElement('div');
+      box.className = 'empty';
+      box.textContent = '接收扫描失败：' + String(error && error.message ? error.message : error);
+      mainEl.appendChild(box);
+    }).finally(function () {
+      refreshEl.classList.remove('spinning');
+    });
+  }
+
+  function load(force) {
+    if (state.scope === 'recv') return loadReceived(force);
+    refreshEl.classList.add('spinning');
+    if (force) setBanner(true);
+    var url = API + '/index?scope=' + encodeURIComponent(state.scope) + (force ? '&refresh=1' : '');
+    fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+      if (!data || !data.ok) throw new Error((data && data.error) || '索引失败');
+      state.items = data.items || [];
+      state.files = data.files || [];
+      state.sends = data.sends || [];
+      state.sendTargets = data.sendTargets || [];
+      state.counts = data.counts;
+      var c = data.counts || {};
+      countsEl.innerHTML = '图片 <b>' + (c.user || 0) + '</b> · 文件 <b>' + (c.files || 0) + '</b> · 投送 <b>' + (c.sends || 0) + '</b> · 工具图片 <b>' + (c.tool || 0) + '</b> · ' + bytesText(c.totalBytes) + ((c.filesMissing || 0) ? ' · ' + c.filesMissing + ' 个文件已不在' : '');
+      setBanner(Boolean(data.building));
+      applyFilter();
+      if (data.building) setTimeout(function () { load(false); }, 1800);
+    }).catch(function (error) {
+      countsEl.textContent = '索引失败';
+      mainEl.innerHTML = '';
+      var box = document.createElement('div');
+      box.className = 'empty';
+      box.textContent = String(error && error.message ? error.message : error);
+      mainEl.appendChild(box);
+    }).finally(function () {
+      refreshEl.classList.remove('spinning');
+      setBanner(false);
+    });
+  }
+
+  // 支持直接带参数打开：/dsh-ap/?scope=file
+  try {
+    var wanted = new URLSearchParams(location.search).get('scope');
+    if (wanted && ['user', 'file', 'send', 'recv', 'tool', 'all'].indexOf(wanted) >= 0) {
+      state.scope = wanted;
+      Array.prototype.forEach.call(el('segments').querySelectorAll('button'), function (b) {
+        b.setAttribute('aria-pressed', b.dataset.scope === state.scope ? 'true' : 'false');
+      });
+    }
+  } catch (e) { /* ignore */ }
+
+  // 在 DSH 侧栏面板里是 iframe 打开的：外面已经有标题栏，这里就不重复一遍。
+  try {
+    if (window.self !== window.top) {
+      document.body.classList.add('embedded');
+      var titleRow = document.querySelector('.titleRow');
+      if (titleRow) titleRow.style.display = 'none';
+    }
+  } catch (e) { /* 跨域时忽略 */ }
+
+  load(false);
+})();
+</script>
+</body>
+</html>

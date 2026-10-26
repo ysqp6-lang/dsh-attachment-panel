@@ -1,0 +1,15 @@
+# dsh-attachment-panel bundle patch
+#
+# 这是 npm 包里的 `dsh.bundle.patch` 层。用官方 CLI 安装时：
+#
+#   dsh plugin --profile <name> add dsh-attachment-panel
+#
+# 命令会把 `dsh.profile.bundles` 与已安装的包对齐，看到 `dsh.bundle` 声明后
+# 自动把 dsh-attachment-panel 追加进 profile 的 bundle 栈；下次启动 profile
+# 会合并这份 patch（就是下面那一行 insert），不需要手改 profile 文件。
+#
+# 如果你之前用「手动挂载」的方式在 profile 的 cordis.patch.yml 里加过同一行，
+# 换成 bundle 通道前请先删掉那一行，避免双挂载（两个宿主半边、两个面板）。
+- insert:
+    - id: attachment-panel
+      name: 'dsh-attachment-panel'

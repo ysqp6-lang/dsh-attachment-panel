@@ -1,0 +1,72 @@
+{
+  "name": "dsh-attachment-panel",
+  "version": "0.6.0",
+  "description": "DeepSeek Harness 的投送面板：发给 DSH 的图片与文件、@ 引用过的本机路径、Taildrop 发出去和收到的文件，按设备与时间列在一起，还能直接在面板里选设备发文件。",
+  "license": "MIT",
+  "author": "Thy <ysqp6@icloud.com>",
+  "type": "module",
+  "main": "./lib/index.js",
+  "icon": "icon.svg",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.4"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "taildrop",
+    "tailscale",
+    "file-transfer",
+    "attachments",
+    "delivery",
+    "macos"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ysqp6-lang/dsh-attachment-panel.git"
+  },
+  "homepage": "https://github.com/ysqp6-lang/dsh-attachment-panel#readme",
+  "bugs": {
+    "url": "https://github.com/ysqp6-lang/dsh-attachment-panel/issues"
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/panel.html",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "test",
+    "docs/panel-pane.jpg",
+    "docs/panel-send-form.jpg",
+    "docs/panel-receive.jpg"
+  ]
+}
